@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="description" content="AURA Studio — Moda contemporânea e minimalista." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>AURA Studio | Loja de Roupas</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Cabeçalho -->
+  <header class="topbar">
+    <div class="container topbar-content">
+      <a href="#" class="brand">AURA<span>.STUDIO</span></a>
+
+      <div class="topbar-actions">
+        <span id="network-status" class="status-pill online" title="Status da conexão">Online</span>
+        <button id="install-btn" class="btn-outline hidden" aria-label="Instalar aplicativo">
+          Instalar App
+        </button>
+        <button id="open-cart-btn" class="cart-trigger" aria-label="Abrir sacola">
+          Sacola <span id="cart-count" class="badge">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner Principal -->
+  <section class="hero">
+    <div class="container hero-inner">
+      <span class="eyebrow">Coleção 2026</span>
+      <h1>Essenciais urbanos com corte preciso.</h1>
+      <p>Tecidos naturais, modelagem atemporal e entrega rápida para todo o Brasil.</p>
+      <a href="#catalogo" class="btn-primary">Explorar Peças</a>
+    </div>
+  </section>
+
+  <!-- Catálogo -->
+  <main id="catalogo" class="container main-section">
+    <div class="toolbar">
+      <div class="filters" role="tablist" aria-label="Filtrar por categoria">
+        <button class="filter-btn active" data-category="todos">Todos</button>
+        <button class="filter-btn" data-category="camisetas">Camisetas</button>
+        <button class="filter-btn" data-category="calcas">Calças</button>
+        <button class="filter-btn" data-category="jaquetas">Jaquetas</button>
+        <button class="filter-btn" data-category="acessorios">Acessórios</button>
+      </div>
+
+      <input
+        type="search"
+        id="search-input"
+        class="search-input"
+        placeholder="Buscar peça..."
+        aria-label="Buscar peça"
+      />
+    </div>
+
+    <div id="product-grid" class="product-grid"></div>
+  </main>
+
+  <!-- Gaveta da Sacola (Carrinho) -->
+  <div id="cart-backdrop" class="backdrop hidden"></div>
+  <aside id="cart-drawer" class="cart-drawer" aria-hidden="true">
+    <div class="cart-header">
+      <h2>Sua Sacola</h2>
+      <button id="close-cart-btn" class="icon-btn" aria-label="Fechar sacola">×</button>
+    </div>
+
+    <div id="cart-items" class="cart-items"></div>
+
+    <div class="cart-footer">
+      <div class="cart-total-row">
+        <span>Subtotal</span>
+        <strong id="cart-total">R$ 0,00</strong>
+      </div>
+      <button id="checkout-btn" class="btn-primary full-width">Finalizar Pedido</button>
+    </div>
+  </aside>
+
+  <!-- Notificação Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <footer class="footer">
+    <div class="container">
+      <p>© 2026 AURA Studio — PWA Storefront.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Catálogo de produtos
+    const PRODUCTS = [
+      {
+        id: 1,
+        name: "Camiseta Heavyweight Boxy",
+        category: "camisetas",
+        price: 139.90,
+        sizes: ["P", "M", "G", "GG"],
+        image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=80"
+      },
+      {
+        id: 2,
+        name: "Calça Alfaiataria Relaxed",
+        category: "calcas",
+        price: 289.90,
+        sizes: ["38", "40", "42", "44"],
+        image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=600&q=80"
+      },
+      {
+        id: 3,
+        name: "Jaqueta Overshirt Sarja",
+        category: "jaquetas",
+        price: 379.90,
+        sizes: ["P", "M", "G"],
+        image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=80"
+      },
+      {
+        id: 4,
+        name: "Camiseta Pima Minimal Off-White",
+        category: "camisetas",
+        price: 159.90,
+        sizes: ["P", "M", "G", "GG"],
+        image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600&q=80"
+      },
+      {
+        id: 5,
+        name: "Calça Cargo Utilitária",
+        category: "calcas",
+        price: 319.90,
+        sizes: ["38", "40", "42"],
+        image: "https://images.unsplash.com/photo-1517438476312-10d79c077509?auto=format&fit=crop&w=600&q=80"
+      },
+      {
+        id: 6,
+        name: "Boné Dad Hat Algodão Lavado",
+        category: "acessorios",
+        price: 99.90,
+        sizes: ["Único"],
+        image: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=600&q=80"
+      }
+    ];
+
+    let cart = JSON.parse(localStorage.getItem("aura_cart")) || [];
+    let selectedCategory = "todos";
+    let searchTerm = "";
+    const selectedSizes = {};
+
+    const productGrid = document.getElementById("product-grid");
+    const cartItemsEl = document.getElementById("cart-items");
+    const cartCountEl = document.getElementById("cart-count");
+    const cartTotalEl = document.getElementById("cart-total");
+    const toastEl = document.getElementById("toast");
+
+    const formatBRL = (value) =>
+      value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      clearTimeout(toastEl._timer);
+      toastEl._timer = setTimeout(() => toastEl.classList.remove("show"), 2600);
+    }
+
+    // Renderizar catálogo
+    function renderProducts() {
+      const filtered = PRODUCTS.filter((item) => {
+        const matchesCat = selectedCategory === "todos" || item.category === selectedCategory;
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        productGrid.innerHTML = `<p class="empty-msg">Nenhuma peça encontrada para essa busca.</p>`;
+        return;
+      }
+
+      productGrid.innerHTML = filtered
+        .map((product) => {
+          const activeSize = selectedSizes[product.id] || product.sizes[0];
+          const sizesHTML = product.sizes
+            .map(
+              (size) => `
+              <button
+                type="button"
+                class="size-chip ${size === activeSize ? "active" : ""}"
+                onclick="selectSize(${product.id}, '${size}')"
+              >${size}</button>`
+            )
+            .join("");
+
+          return `
+            <article class="card">
+              <div class="card-img-wrap">
+                <img
+                  src="${product.image}"
+                  alt="${product.name}"
+                  loading="lazy"
+                  onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22500%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23e5e5e5%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23777%22 font-family=%22sans-serif%22>AURA STUDIO</text></svg>'"
+                />
+              </div>
+              <div class="card-body">
+                <span class="card-cat">${product.category}</span>
+                <h3>${product.name}</h3>
+                <p class="price">${formatBRL(product.price)}</p>
+                <div class="size-row">${sizesHTML}</div>
+                <button class="btn-primary full-width" onclick="addToCart(${product.id})">
+                  Adicionar à Sacola
+                </button>
+              </div>
+            </article>
+          `;
+        })
+        .join("");
+    }
+
+    window.selectSize = (productId, size) => {
+      selectedSizes[productId] = size;
+      renderProducts();
+    };
+
+    window.addToCart = (productId) => {
+      const product = PRODUCTS.find((p) => p.id === productId);
+      const size = selectedSizes[productId] || product.sizes[0];
+      const existing = cart.find((item) => item.id === productId && item.size === size);
+
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ ...product, size, qty: 1 });
+      }
+
+      saveAndRenderCart();
+      showToast(`${product.name} (${size}) adicionado!`);
+    };
+
+    window.updateQty = (index, delta) => {
+      cart[index].qty += delta;
+      if (cart[index].qty <= 0) {
+        cart.splice(index, 1);
+      }
+      saveAndRenderCart();
+    };
+
+    function saveAndRenderCart() {
+      localStorage.setItem("aura_cart", JSON.stringify(cart));
+      const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
+      const totalPrice = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+      cartCountEl.textContent = totalItems;
+      cartTotalEl.textContent = formatBRL(totalPrice);
+
+      if (cart.length === 0) {
+        cartItemsEl.innerHTML = `<p class="empty-msg">Sua sacola está vazia.</p>`;
+        return;
+      }
+
+      cartItemsEl.innerHTML = cart
+        .map(
+          (item, index) => `
+          <div class="cart-item">
+            <img src="${item.image}" alt="${item.name}" />
+            <div class="cart-item-info">
+              <h4>${item.name}</h4>
+              <small>Tamanho: ${item.size}</small>
+              <p>${formatBRL(item.price * item.qty)}</p>
+            </div>
+            <div class="qty-controls">
+              <button onclick="updateQty(${index}, -1)" aria-label="Diminuir">-</button>
+              <span>${item.qty}</span>
+              <button onclick="updateQty(${index}, 1)" aria-label="Aumentar">+</button>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+    }
+
+    // Eventos de filtro e busca
+    document.querySelectorAll(".filter-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelector(".filter-btn.active").classList.remove("active");
+        btn.classList.add("active");
+        selectedCategory = btn.dataset.category;
+        renderProducts();
+      });
+    });
+
+    document.getElementById("search-input").addEventListener("input", (e) => {
+      searchTerm = e.target.value;
+      renderProducts();
+    });
+
+    // Controle da gaveta do carrinho
+    const cartDrawer = document.getElementById("cart-drawer");
+    const cartBackdrop = document.getElementById("cart-backdrop");
+
+    function toggleCart(open) {
+      cartDrawer.classList.toggle("open", open);
+      cartBackdrop.classList.toggle("hidden", !open);
+      cartDrawer.setAttribute("aria-hidden", !open);
+    }
+
+    document.getElementById("open-cart-btn").addEventListener("click", () => toggleCart(true));
+    document.getElementById("close-cart-btn").addEventListener("click", () => toggleCart(false));
+    cartBackdrop.addEventListener("click", () => toggleCart(false));
+
+    document.getElementById("checkout-btn").addEventListener("click", () => {
+      if (cart.length === 0) {
+        showToast("Adicione peças antes de finalizar.");
+        return;
+      }
+      cart = [];
+      saveAndRenderCart();
+      toggleCart(false);
+      showToast("Pedido realizado com sucesso!");
+    });
+
+    // Status Online / Offline
+    const statusPill = document.getElementById("network-status");
+    function updateNetworkStatus() {
+      const online = navigator.onLine;
+      statusPill.textContent = online ? "Online" : "Offline";
+      statusPill.className = `status-pill ${online ? "online" : "offline"}`;
+    }
+    window.addEventListener("online", updateNetworkStatus);
+    window.addEventListener("offline", updateNetworkStatus);
+
+    // Instalação PWA (beforeinstallprompt)
+    let deferredPrompt;
+    const installBtn = document.getElementById("install-btn");
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.remove("hidden");
+    });
+
+    installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        installBtn.classList.add("hidden");
+      }
+      deferredPrompt = null;
+    });
+
+    // Registro do Service Worker
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("./sw.js")
+          .catch((err) => console.error("Erro ao registrar SW:", err));
+      });
+    }
+
+    // Inicialização
+    updateNetworkStatus();
+    renderProducts();
+    saveAndRenderCart();
+  </script>
+</body>
+</html>
